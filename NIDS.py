@@ -10,25 +10,34 @@
        mark many unique sessions tied to one username as suspicious after a threshold has been reached to account for authorized people simply entering their password wrong since authorized people
         won't attempt to enter a password 10-20 times, OR, can check the packet timestamps since people won't be entering their password as quickly as a brute force attack tool. can adjust as needed to fit
         syntax for different servers)  '''
-
-
 # rdpcap will read a .pcap file and return contents as a list like object (packetlist). ip allows access to fields within the ipv4 layer of a packet (allows extracting source/destination ip)
 from scapy.all import rdpcap, IP, TCP
+import os
 
 # Load pcap file into memory
-pcap = rdpcap(r"C:\Users\Muhammad\Desktop\NIDS python files\bruteforce.pcap")
+nids_dir = os.path.dirname(os.path.abspath(__file__))
+pcap_path = os.path.join(nids_dir, "bruteforce.pcap")
+pcap = rdpcap(pcap_path)
 def source_addresses():
     # Create variable that will store source addresses into a set, which by nature will only store unique items, this acts as a filter to show only unique clients and servers
     source_count = {}
     # For loop that checks if an IP address is present in the packet, this will filter out any communication that takes place on OSI layers 1 and 2 (Does not contain layer 3 communication)
     for pkt in pcap:
         if IP in pkt:
+            # pkt[IP] returns the IP header of a packet, which is then filtered to return the source address only from that header
             src = pkt[IP].src
+            ''' Takes source address from a packet, then adds it to a dictionary variable, the loop will go down the list of packets in the pcap,
+              and check every packet that contains an IP layer, and extract the source address from that IP header. the first time a source address is
+              seen, the dictionary will set the value associated with the key (which is the source IP address) to 0, if that address
+              is ever seen again in the pcap file, it will increment that value by 1. This method links a source IP address (key) to a counter (value)
+              which is used to keep track of the amount of times it appeared in a pcap file.
+            '''
+            # Put src into dictionary as key then, get key value, if no value, value = 0, then add 1 to value and assign updated value to key.
             source_count[src] = source_count.get(src, 0) + 1
     return source_count
 
 
-# Same process as source_addresses() function, except filtering to destination addresses only
+# Same process as source_addresses() function, except filtering the IP header to show destination addresse only
 def destination_addresses():
     dest_count = {}
     for pkt in pcap:
