@@ -19,22 +19,37 @@ from scapy.all import rdpcap, IP, TCP
 pcap = rdpcap(r"C:\Users\Muhammad\Desktop\NIDS python files\bruteforce.pcap")
 def source_addresses():
     # Create variable that will store source addresses into a set, which by nature will only store unique items, this acts as a filter to show only unique clients and servers
-    source_addr = set()
+    source_count = {}
     # For loop that checks if an IP address is present in the packet, this will filter out any communication that takes place on OSI layers 1 and 2 (Does not contain layer 3 communication)
     for pkt in pcap:
         if IP in pkt:
-            source_addr.add(pkt[IP].src)
-    for src_ip in sorted(source_addr):
-        print("Source addresses:", src_ip)
+            src = pkt[IP].src
+            source_count[src] = source_count.get(src, 0) + 1
+    return source_count
+
 
 # Same process as source_addresses() function, except filtering to destination addresses only
 def destination_addresses():
-    dest_addr = set()
+    dest_count = {}
     for pkt in pcap:
         if IP in pkt:
-            dest_addr.add(pkt[IP].dst)
-    for dst_ip in sorted(dest_addr):
-        print("Destination addresses:", dst_ip)
+            dst = pkt[IP].dst
+            dest_count[dst] = dest_count.get(dst, 0) + 1
+    return dest_count
+
+def ip_enumerator():
+    src_ips = source_addresses()
+    dst_ips = destination_addresses()
+    all_ips = set(src_ips) | set(dst_ips)
+    for ip in sorted(all_ips):
+        src_count = src_ips.get(ip, 0)
+        dst_count = dst_ips.get(ip, 0)
+        total = src_count + dst_count
+        print(f"IP Address: {ip}")
+        print(f"  → Source count: {src_count}")
+        print(f"  → Destination count: {dst_count}")
+        print(f"  → Total appearances: {total}\n")
+
 
 # Function to check if a packet contains a TCP SYN flag, this will mark the source IP as the client, and the destination IP as the server, it will also mark the start of the TCP handshake/session
 def tcp_syn():
@@ -47,8 +62,10 @@ def tcp_syn():
                 dst = pkt[IP].dst
                 flags = pkt[TCP].flags
                 print(f"Source: {src}, Destination: {dst}, TCP Flags: {flags}")
+                
 
 
 source_addresses()
 destination_addresses()
 tcp_syn()
+ip_enumerator()
