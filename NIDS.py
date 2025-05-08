@@ -14,12 +14,15 @@
 from scapy.all import rdpcap, IP, TCP
 import os
 
+# Dictionary variable that will store source IP addresses as the key, and an int as the value, the value will increment by 1 if a function determines an address to be potentially malicious.
+malicious = {}
+
 # Load pcap file into memory
 nids_dir = os.path.dirname(os.path.abspath(__file__))
 pcap_path = os.path.join(nids_dir, "bruteforce.pcap")
 pcap = rdpcap(pcap_path)
 def source_addresses():
-    # Create variable that will store source addresses into a set, which by nature will only store unique items, this acts as a filter to show only unique clients and servers
+    # Create variable that will store source addresses into a dictionary, which by nature will only store unique items, this acts as a filter to show only unique clients and servers
     source_count = {}
     # For loop that checks if an IP address is present in the packet, this will filter out any communication that takes place on OSI layers 1 and 2 (Does not contain layer 3 communication)
     for pkt in pcap:
@@ -34,6 +37,10 @@ def source_addresses():
             '''
             # Put src into dictionary as key then, get key value, if no value, value = 0, then add 1 to value and assign updated value to key.
             source_count[src] = source_count.get(src, 0) + 1
+    for src, counter in source_count.items():
+        if counter >= 50:
+            malicious[src] = malicious.get(src, 0) + 1
+            print (malicious)
     return source_count
 
 
@@ -74,7 +81,6 @@ def tcp_syn():
                 
 
 
-source_addresses()
-destination_addresses()
+
 tcp_syn()
 ip_enumerator()
