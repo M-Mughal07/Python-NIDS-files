@@ -52,6 +52,7 @@ def source_addresses():
     return source_count
 
 
+
 # Same process as source_addresses() function, except filtering the IP header to show destination addresse only
 def destination_addresses():
     dest_count = {}
@@ -63,6 +64,7 @@ def destination_addresses():
 
 # Function to check if a packet contains a TCP SYN flag, this will mark the source IP as the client, and the destination IP as the server, it will also mark the start of the TCP handshake/session
 def tcp_syn():
+    pkt_count = 0
     for pkt in pcap:
         if TCP in pkt:
             tcp_flags = pkt[TCP].flags
@@ -71,9 +73,12 @@ def tcp_syn():
                 src_flags = pkt[IP].src
                 dst_flags = pkt[IP].dst
                 flags = pkt[TCP].flags
-                if src_flags == malicious.get():
-                    print (malicious())
-                #print(f"Source: {src}, Destination: {dst}, TCP Flags: {flags}")
+                pkt_count += 1
+    # Checking if the source ip from the packets containing TCP/SYN flags is in the potentially malicious IP dictionary
+    # If there is a match, generate alert stating abnormality 
+    if src_flags in malicious:
+        print(f"Abnormal amount ({pkt_count}) TCP/SYN packets detected from {src_flags}")
+                #print(f"Source: {src_flags}, Destination: {dst_flags}, TCP Flags: {flags}")
                 
 
 def ip_enumerator():
@@ -91,7 +96,6 @@ def ip_enumerator():
 
 
 
-
-
-tcp_syn()
 ip_enumerator()
+print ("DEBUG FOR MALICIOUS DICTIONARY: REMOVE IN FINAL VERSION", malicious)
+tcp_syn()
