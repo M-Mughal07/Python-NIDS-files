@@ -42,8 +42,8 @@ def source_addresses():
             source_count[src] = source_count.get(src, 0) + 1
     # This loop will check each keys value in the source_count dictionary, 
     # when a source address (key) hits a packet count(value) of greater than or equal to 50, it will print that source address
-    for src, counter in source_count.items():
-        if counter >= 100:
+    for src, pkt_counter in source_count.items():
+        if pkt_counter >= 100:
             # Adding source addresses to the malicious dictionary,
             # Incrementing the value of a source address to mark it as potentially malicious 
             malicious[src] = malicious.get(src, 0) + 1
