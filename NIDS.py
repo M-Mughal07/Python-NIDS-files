@@ -13,6 +13,7 @@
 # rdpcap will read a .pcap file and return contents as a list like object (packetlist). 
 # ip allows access to fields within the ipv4 layer of a packet (allows extracting source/destination ip)
 from scapy.all import rdpcap, IP, TCP
+from datetime import datetime, timedelta
 import os
 
 # Dictionary variable that will store source IP addresses as the key, and an int as the value, 
@@ -52,8 +53,22 @@ def source_addresses():
     return source_count
 
 
+def packet_timestamp_frequency():
+    x = []
+    # Get packet counter from source_addresses(), check timestamps if packet threshold is reached
+    for pkt in pcap:
+        if IP in pkt:
+            time_ip = pkt[IP].src
+            if time_ip in malicious and malicious.get(time_ip) >= 1:
+                timestamp = pkt[IP].time
+                # Since the attack in the example is happening microseconds apart, have to use small values to check timedelta
+                print (timestamp)
+                
 
-# Same process as source_addresses() function, except filtering the IP header to show destination addresse only
+
+
+
+# Same process as source_addresses() function, except filtering the IP header to show destination address only
 def destination_addresses():
     dest_count = {}
     for pkt in pcap:
@@ -70,14 +85,14 @@ def tcp_syn():
             tcp_flags = pkt[TCP].flags
             if tcp_flags == "S":
                 # Will print out every SYN packet sent from the client, effectivly, prints out how many TCP sessions the client initiated with the server
-                src_flags = pkt[IP].src
+                src_ip_flags = pkt[IP].src
                 dst_flags = pkt[IP].dst
                 flags = pkt[TCP].flags
                 pkt_count += 1
     # Checking if the source ip from the packets containing TCP/SYN flags is in the potentially malicious IP dictionary
     # If there is a match, generate alert stating abnormality 
-    if src_flags in malicious:
-        print(f"Abnormal amount ({pkt_count}) TCP/SYN packets detected from {src_flags}")
+    if src_ip_flags in malicious:
+        print(f"Abnormal amount ({pkt_count}) TCP/SYN packets detected from {src_ip_flags}")
                 #print(f"Source: {src_flags}, Destination: {dst_flags}, TCP Flags: {flags}")
                 
 
@@ -99,3 +114,4 @@ def ip_enumerator():
 ip_enumerator()
 print ("DEBUG FOR MALICIOUS DICTIONARY: REMOVE IN FINAL VERSION", malicious)
 tcp_syn()
+packet_timestamp_frequency()
