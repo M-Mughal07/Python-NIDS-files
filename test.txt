@@ -1,5 +1,0 @@
-lol0 brute
-lol1 normal
-lol2 brute
-lol3 normal
-lol4 brute
