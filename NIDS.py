@@ -20,15 +20,16 @@ import os
 # the value will increment by 1 if a function determines an address to be potentially malicious.
 malicious = {}
 
+# Variable that will mark the login server as the attack target (Used to filter it out of potential attacker addresses)
+login_server = set()
+
 # Load pcap file into memory
 nids_dir = os.path.dirname(os.path.abspath(__file__))
 pcap_path = os.path.join(nids_dir, "bruteforce.pcap")
 pcap = rdpcap(pcap_path)
 def source_addresses():
-    # Create variable that will store source addresses into a dictionary, which by nature will only store unique items,
-    # this acts as a filter to show only unique clients and servers
     source_count = {}
-    # For loop that checks if an IP address is present in the packet, this will filter out any communication that takes place on OSI layers 1 and 2 (Does not contain layer 3 communication)
+    # Filters packet info to OSI layer 3 only
     for pkt in pcap:
         if IP in pkt:
             # pkt[IP] returns the IP header of a packet, which is then filtered to return the source address only from that header
@@ -42,10 +43,9 @@ def source_addresses():
             # Put src into dictionary as key then, get key value, if no value, value = 0, then add 1 to value and assign updated value to key.
             source_count[src] = source_count.get(src, 0) + 1
     # This loop will check each keys value in the source_count dictionary, 
-    # when a source address (key) hits a packet count(value) of greater than or equal to 50, it will print that source address
+    # when a source address (key) hits a packet count(value) of greater than or equal to 100, it will print that source address
     for src, pkt_counter in source_count.items():
         if pkt_counter >= 100:
-            # Adding source addresses to the malicious dictionary,
             # Incrementing the value of a source address to mark it as potentially malicious 
             malicious[src] = malicious.get(src, 0) + 1
             if malicious.get(src) >= 1:
@@ -54,15 +54,19 @@ def source_addresses():
 
 
 def packet_timestamp_frequency():
-    x = []
     # Get packet counter from source_addresses(), check timestamps if packet threshold is reached
+    #x = 0
     for pkt in pcap:
-        if IP in pkt:
-            time_ip = pkt[IP].src
-            if time_ip in malicious and malicious.get(time_ip) >= 1:
-                timestamp = pkt[IP].time
-                # Since the attack in the example is happening microseconds apart, have to use small values to check timedelta
-                print (timestamp)
+        # Isolates packet printout to only show client(s) by performing a membership test against the login_server set
+        if IP in pkt and pkt[IP].src not in login_server:
+            src_ip = pkt[IP].src
+            if src_ip in malicious and malicious.get(src_ip) >= 1:
+                print (src_ip)
+                #x += 1
+                pkt_ts = pkt.time
+                
+                
+
                 
 
 
@@ -86,7 +90,6 @@ def tcp_syn():
             if tcp_flags == "S":
                 # Will print out every SYN packet sent from the client, effectivly, prints out how many TCP sessions the client initiated with the server
                 src_ip_flags = pkt[IP].src
-                dst_flags = pkt[IP].dst
                 flags = pkt[TCP].flags
                 pkt_count += 1
     # Checking if the source ip from the packets containing TCP/SYN flags is in the potentially malicious IP dictionary
@@ -94,6 +97,9 @@ def tcp_syn():
     if src_ip_flags in malicious:
         print(f"Abnormal amount ({pkt_count}) TCP/SYN packets detected from {src_ip_flags}")
                 #print(f"Source: {src_flags}, Destination: {dst_flags}, TCP Flags: {flags}")
+    # Login server and client variables are assigned here because only a client will send a TCP/SYN packet,
+    # making the destination address of that packet the login server
+    login_server.add(pkt[IP].dst)
                 
 
 def ip_enumerator():
