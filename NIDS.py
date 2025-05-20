@@ -4,7 +4,7 @@ from scapy.all import rdpcap, IP, TCP
 from datetime import datetime, timedelta
 import os
 
-# Dictionary variable that will store source IP addresses as the key, and an int as the value, 
+# Dictionary variable that will store source IP addresses as the key, and an int as the value representing a malicious weight,
 # the value will increment by 1 if a function determines an address to be potentially malicious.
 malicious = {}
 
@@ -30,11 +30,10 @@ def source_addresses():
             '''
             # Put src into dictionary as key then, get key value, if no value, value = 0, then add 1 to value and assign updated value to key.
             source_count[src] = source_count.get(src, 0) + 1
-    # This loop will check each keys value in the source_count dictionary, 
-    # when a source address (key) hits a packet count(value) of greater than or equal to 100, it will print that source address
+    # When a source address (key) hits a packet count(value) of greater than or equal to 100, it will print that source address
     for src, pkt_counter in source_count.items():
         if pkt_counter >= 100:
-            # Incrementing the value of a source address to mark it as potentially malicious 
+            # Incrementing the malicous weight (value) of a source address to mark it as potentially malicious 
             malicious[src] = malicious.get(src, 0) + 1
             if malicious.get(src) >= 1:
                 print (f"more than 100 packets detected from source address {src}")
@@ -42,19 +41,29 @@ def source_addresses():
 
 
 def packet_timestamp_frequency():
-    # Get packet counter from source_addresses(), check timestamps if packet threshold is reached
-    #x = 0
+    pkt_counter = 0
+    previous = None
+    # Will check the frequency between blocks of this many packets
+    chunk_size = 50
+    # Will store every client packet timestamp
+    avg_time = []
     for pkt in pcap:
-        # Isolates packet printout to only show client(s) by performing a membership test against the login_server set
-        if IP in pkt and pkt[IP].src not in login_server:
-            src_ip = pkt[IP].src
-            if src_ip in malicious and malicious.get(src_ip) >= 1:
-                print (src_ip)
-                #x += 1
-                pkt_ts = pkt.time
-
-                
-                
+        client_ip = pkt[IP].src
+        # Checks if source address is in malicious dictionary, and if it has a malicious weight of >=1, calculates time delta
+        if client_ip in malicious and malicious.get(client_ip) >= 1:  
+            # Isolates packet printout to only show client(s) by performing a membership test against the login_server set
+            if IP in pkt and client_ip not in login_server:
+                pkt_counter += 1
+                avg_time.append(pkt.time)
+                # Calculates how long it took for the client to send X (chunk_size) amount of packets and the average time between each packet (interval)
+                if pkt_counter ==  chunk_size:
+                    # Use negative index to access the last item of a list without knowing the length of the list
+                    delta = avg_time[-1] - avg_time[0]
+                    avg_interval = delta / (chunk_size - 1)
+                    print (avg_interval)
+                    # Resetting the list and counter variables for the next chunk of packets
+                    avg_time = []
+                    pkt_counter = 0
 
                 
 
