@@ -42,7 +42,6 @@ def source_addresses():
 
 def packet_timestamp_frequency():
     pkt_counter = 0
-    previous = None
     # Will check the frequency between blocks of this many packets
     chunk_size = 50
     # Will store every client packet timestamp
@@ -55,15 +54,22 @@ def packet_timestamp_frequency():
             if IP in pkt and client_ip not in login_server:
                 pkt_counter += 1
                 avg_time.append(pkt.time)
-                # Calculates how long it took for the client to send X (chunk_size) amount of packets and the average time between each packet (interval)
+                # Calculates how long it took for the client to send (chunk_size) amount of packets and the average time between each packet (interval)
                 if pkt_counter ==  chunk_size:
                     # Use negative index to access the last item of a list without knowing the length of the list
                     delta = avg_time[-1] - avg_time[0]
+                    # subtract 1 from the chunk size since intervals between packets have to be calculated
                     avg_interval = delta / (chunk_size - 1)
-                    print (avg_interval)
+                    #print (f"{ctr} DEBUG: {avg_interval} seconds") DEBUG STATEMENT REMOVE IN FINAL
+                    # Assuming HTTPS is being used to login to a web server, the threshold for abnormal packet intervals should be < 5-7 ms
+                    if avg_interval < 0.6000:
+                        print (f"{chunk_size} packets detected with abnormal intervals from {client_ip} at {avg_interval:.4f} seconds between packets")
                     # Resetting the list and counter variables for the next chunk of packets
                     avg_time = []
                     pkt_counter = 0
+    # Incrementing malicious counter for client address to mark it as potentially malicious
+    malicious[client_ip] = malicious.get(client_ip, 0) + 1
+    print (f"DEBUG: {malicious}")
 
                 
 
@@ -94,6 +100,8 @@ def tcp_syn():
     # If there is a match, generate alert stating abnormality 
     if src_ip_flags in malicious:
         print(f"Abnormal amount ({pkt_count}) TCP/SYN packets detected from {src_ip_flags}")
+        malicious[src_ip_flags] = malicious.get(src_ip_flags, 0) + 1
+        print (f"DEBUG: {malicious}")
                 #print(f"Source: {src_flags}, Destination: {dst_flags}, TCP Flags: {flags}")
     # Login server and client variables are assigned here because only a client will send a TCP/SYN packet,
     # making the destination address of that packet the login server
