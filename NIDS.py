@@ -22,24 +22,19 @@ def source_addresses():
         if IP in pkt:
             # pkt[IP] returns the IP header of a packet, which is then filtered to return the source address only from that header
             src = pkt[IP].src
-            ''' Takes source address from a packet, then adds it to a dictionary variable, the loop will go down the list of packets in the pcap,
-              and check every packet that contains an IP layer, and extract the source address from that IP header. the first time a source address is
-              seen, the dictionary will set the value associated with the key (which is the source IP address) to 0, if that address
-              is ever seen again in the pcap file, it will increment that value by 1. This method links a source IP address (key) to a counter (value)
-              which is used to keep track of the amount of times it appeared in a pcap file.
-            '''
-            # Put src into dictionary as key then, get key value, if no value, value = 0, then add 1 to value and assign updated value to key.
+            # Put source addresses into a dictionary and track how many times they appear
             source_count[src] = source_count.get(src, 0) + 1
-    # When a source address (key) hits a packet count(value) of greater than or equal to 100, it will print that source address
+    # When a source address appears >= 100 times in the IP header, generate an alert since that many packets is abnormal for a login session
     for src, pkt_counter in source_count.items():
         if pkt_counter >= 100:
             # Incrementing the malicous weight (value) of a source address to mark it as potentially malicious 
             malicious[src] = malicious.get(src, 0) + 1
+            # Check value of source address and generate alert if threshold reached
             if malicious.get(src) >= 1:
                 print (f"more than 100 packets detected from source address {src}")
     return source_count
 
-
+# Function to calculate how quickly a client sends packets to a login server
 def packet_timestamp_frequency():
     pkt_counter = 0
     # Will check the frequency between blocks of this many packets
@@ -60,9 +55,9 @@ def packet_timestamp_frequency():
                     delta = avg_time[-1] - avg_time[0]
                     # subtract 1 from the chunk size since intervals between packets have to be calculated
                     avg_interval = delta / (chunk_size - 1)
-                    #print (f"{ctr} DEBUG: {avg_interval} seconds") DEBUG STATEMENT REMOVE IN FINAL
                     # Assuming HTTPS is being used to login to a web server, the threshold for abnormal packet intervals should be < 5-7 ms
                     if avg_interval < 0.6000:
+                        # Generating alert and rounding the value of avg_interval up to 4 digits 
                         print (f"{chunk_size} packets detected with abnormal intervals from {client_ip} at {avg_interval:.4f} seconds between packets")
                     # Resetting the list and counter variables for the next chunk of packets
                     avg_time = []
@@ -70,10 +65,6 @@ def packet_timestamp_frequency():
     # Incrementing malicious counter for client address to mark it as potentially malicious
     malicious[client_ip] = malicious.get(client_ip, 0) + 1
     print (f"DEBUG: {malicious}")
-
-                
-
-
 
 
 # Same process as source_addresses() function, except filtering the IP header to show destination address only
@@ -85,29 +76,25 @@ def destination_addresses():
             dest_count[dst] = dest_count.get(dst, 0) + 1
     return dest_count
 
-# Function to check if a packet contains a TCP SYN flag, this will mark the source IP as the client, and the destination IP as the server, it will also mark the start of the TCP handshake/session
+# Function to check if a packet contains a TCP/SYN flag,
 def tcp_syn():
     pkt_count = 0
     for pkt in pcap:
         if TCP in pkt:
             tcp_flags = pkt[TCP].flags
             if tcp_flags == "S":
-                # Will print out every SYN packet sent from the client, effectivly, prints out how many TCP sessions the client initiated with the server
+                # Will print out every TCP/SYN packet sent from the client, effectivly, prints out how many TCP sessions the client initiated with the server
                 src_ip_flags = pkt[IP].src
-                flags = pkt[TCP].flags
                 pkt_count += 1
-    # Checking if the source ip from the packets containing TCP/SYN flags is in the potentially malicious IP dictionary
-    # If there is a match, generate alert stating abnormality 
+    # Checking if the source ip from the packets containing TCP/SYN flags is in the malicious IP dictionary
     if src_ip_flags in malicious:
         print(f"Abnormal amount ({pkt_count}) TCP/SYN packets detected from {src_ip_flags}")
         malicious[src_ip_flags] = malicious.get(src_ip_flags, 0) + 1
         print (f"DEBUG: {malicious}")
-                #print(f"Source: {src_flags}, Destination: {dst_flags}, TCP Flags: {flags}")
-    # Login server and client variables are assigned here because only a client will send a TCP/SYN packet,
-    # making the destination address of that packet the login server
+    # Login server is marked here since only a client will send a TCP/SYN packet
     login_server.add(pkt[IP].dst)
                 
-
+# Function that prints an IP address, how many packets it sent/received, and how many times it appeared in the pcap file
 def ip_enumerator():
     src_ips = source_addresses()
     dst_ips = destination_addresses()
@@ -124,6 +111,5 @@ def ip_enumerator():
 
 
 ip_enumerator()
-print ("DEBUG FOR MALICIOUS DICTIONARY: REMOVE IN FINAL VERSION", malicious)
 tcp_syn()
 packet_timestamp_frequency()
