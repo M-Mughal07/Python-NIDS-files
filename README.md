@@ -6,7 +6,7 @@ Example bruteforce.pcap is included to make testing easier, any .pcap format fil
 Overall function and logic to be used:
 
 •	Since a brute force attack typically originates from a single IP address, targets a single username, and the session must be closed (TCP handshake must be completed),
-•	These markers can be used in signature based detection of a brute force attack. Also, since a NIDS must be placed between a server and client, it will be able to decrypt HTTPS communication/any other encrypted data
+•	These markers can be used in signature based detection of a brute force attack. If an intercepting proxy with deep packet inspection is setup, the NIDS will also analyze packet payload to generate an alert for any account usernames being targetted
 •	I will use a counter system against a specific IP address, if that address is sending multiple login requests to the same username, counter goes up, if the server is responding to an address with multiple login request failed responses/specific HTTP status codes the counter goes up etc...
 
 Key Variables/Markers: 
