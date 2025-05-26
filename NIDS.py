@@ -1,6 +1,6 @@
 # rdpcap will read a .pcap file and return contents as a list like object (packetlist). 
 # ip allows access to fields within the ipv4 layer of a packet (allows extracting source/destination ip)
-from scapy.all import rdpcap, IP, TCP
+from scapy.all import rdpcap, IP, TCP, Raw
 from datetime import datetime, timedelta
 import os
 
@@ -66,7 +66,6 @@ def packet_timestamp_frequency():
     malicious[client_ip] = malicious.get(client_ip, 0) + 1
     print (f"DEBUG: {malicious}")
 
-
 # Same process as source_addresses() function, except filtering the IP header to show destination address only
 def destination_addresses():
     dest_count = {}
@@ -84,16 +83,42 @@ def tcp_syn():
             tcp_flags = pkt[TCP].flags
             if tcp_flags == "S":
                 # Will print out every TCP/SYN packet sent from the client, effectivly, prints out how many TCP sessions the client initiated with the server
-                src_ip_flags = pkt[IP].src
+                src_ip = pkt[IP].src
                 pkt_count += 1
     # Checking if the source ip from the packets containing TCP/SYN flags is in the malicious IP dictionary
-    if src_ip_flags in malicious:
-        print(f"Abnormal amount ({pkt_count}) TCP/SYN packets detected from {src_ip_flags}")
-        malicious[src_ip_flags] = malicious.get(src_ip_flags, 0) + 1
+    if src_ip in malicious:
+        print(f"Abnormal amount ({pkt_count}) TCP/SYN packets detected from {src_ip}")
+        malicious[src_ip] = malicious.get(src_ip, 0) + 1
         print (f"DEBUG: {malicious}")
     # Login server is marked here since only a client will send a TCP/SYN packet
     login_server.add(pkt[IP].dst)
                 
+
+# Function that will check if an attacker is targetting any specific username
+# Extract packet payload, isolate lines to show anything related to username ("username =, user = uname =" etc)
+def uname_alerts():
+    ctr = 0
+    # Dict for usernames, will store uname and how many times login was attempted against it
+    uname = {}
+    for pkt in pcap:
+        src_ip = pkt[IP].src
+        # Filtering packet information by payload presence, and showing malicious addresses only
+        if Raw in pkt and src_ip in malicious and src_ip not in login_server:
+            ctr += 1
+            # .decode converts a byte string into a readable string (unicode)
+            payload = pkt[Raw].load.decode()
+            # Removing trailing whitespaces/lines to clean up output
+            clean_payload = payload.strip()
+            for keyword in ["user", "username", "user name", "uname"]:
+                if keyword in clean_payload.lower():
+                    # FOR FUTURE: Update logic to allow tracking of more than one address, currently only tracks/prints out login attempts for 
+                    # one address only
+                    uname[clean_payload] = uname.get(clean_payload, 0) + 1
+    print (f"Client address {src_ip} attempted to login to {uname.keys()} {uname.values()} times")
+            
+
+
+
 # Function that prints an IP address, how many packets it sent/received, and how many times it appeared in the pcap file
 def ip_enumerator():
     src_ips = source_addresses()
@@ -113,3 +138,4 @@ def ip_enumerator():
 ip_enumerator()
 tcp_syn()
 packet_timestamp_frequency()
+uname_alerts()
