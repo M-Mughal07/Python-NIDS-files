@@ -101,24 +101,33 @@ def tcp_syn():
 # Function that will check if an attacker is targetting any specific username
 # Extract packet payload, isolate lines to show anything related to username ("username =, user = uname =" etc)
 def uname_alerts():
-    ctr = 0
-    # Dict for usernames, will store uname and how many times login was attempted against it
-    uname = {}
+    login_tracker = {}
     for pkt in pcap:
         src_ip = pkt[IP].src
         # Filtering packet information by payload presence, and showing malicious addresses only
         if Raw in pkt and src_ip in malicious and src_ip not in login_server:
-            ctr += 1
             # .decode converts a byte string into a readable string (unicode)
             payload = pkt[Raw].load.decode()
             # Removing trailing whitespaces/lines to clean up output
             clean_payload = payload.strip()
+            # Adding source address to dictionary to track what usernames it attempts to login to
+            if src_ip not in login_tracker:
+                login_tracker[src_ip] = {}
+            # Matching a keyword to packet payload to detect if a client attempts login to any username
+            '''Can potentially add HTTP POST request syntax if HTTP(S) is used to login since that will contain the username/pass too'''
             for keyword in ["user", "username", "user name", "uname"]:
-                if keyword in clean_payload.lower():
-                    # FOR FUTURE: Update logic to allow tracking of more than one address, currently only tracks/prints out login attempts for 
-                    # one address only
-                    uname[clean_payload] = uname.get(clean_payload, 0) + 1
-    print (f"Client address {src_ip} attempted to login to {uname.keys()} {uname.values()} times. \n")
+                # Assigning new name to clean_payload for clarity 
+                uname = clean_payload
+                # Setting the payload to all lowercase to allow for easier keyword detection
+                if keyword in uname.lower():
+                    # Nested dictionaries like a folder tree, uname is a subdirectory inside src_ip;
+                    # It contains all usernames a client attempted to login to, and how many times login was attempted 
+                    login_tracker[src_ip][uname] = login_tracker[src_ip].get(uname, 0) + 1
+    # These loops will extract keys and values from both nested dictionaries and generate an alert when malicious addresses attempt login to any account
+    for address, user in login_tracker.items():
+        print (f"\n Client: {address} attempted to log in to:")
+        for target_user, counter in user.items():
+            print (f" {target_user} | {counter} time(s)")
             
 
 
