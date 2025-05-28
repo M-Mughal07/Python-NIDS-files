@@ -1,5 +1,5 @@
 # Python-NIDS-files
-My own NIDS created in python (Work in progress)
+My own NIDS (Network Intrusion Detection Device) created in python (Work in progress)
 Currently only checks a pcap for a bruteforce attack, will add more attack detections in the future.
 Example bruteforce.pcap is included to make testing easier, any .pcap format file can be used.
 
