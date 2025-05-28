@@ -1,7 +1,10 @@
-# rdpcap will read a .pcap file and return contents as a list like object (packetlist). 
-# ip allows access to fields within the ipv4 layer of a packet (allows extracting source/destination ip)
+# The scapy module is used here to analze and extract packet information from a .pcap file
+# The rdpcap class will read a .pcap file and return the contents as a list like object (packetlist). 
+# Subsequent classes extract their respective layers of data from a packet (IP layer, Raw packet data layer, TCP layer etc...)
 from scapy.all import rdpcap, IP, TCP, Raw
+# datetime module used to calculate time intervals between client packets
 from datetime import datetime, timedelta
+# os module used to locate the .pcap file being analyzed 
 import os
 
 # Dictionary variable that will store source IP addresses as the key, and an int as the value representing a malicious weight,
@@ -11,10 +14,13 @@ malicious = {}
 # Variable that will mark the login server as the attack target (Used to filter it out of potential attacker addresses)
 login_server = set()
 
-# Load pcap file into memory
+# Assumes the .pcap file is in the same folder as this NIDS.py file
 nids_dir = os.path.dirname(os.path.abspath(__file__))
 pcap_path = os.path.join(nids_dir, "bruteforce.pcap")
+# Loading .pcap file into memory 
 pcap = rdpcap(pcap_path)
+
+
 def source_addresses():
     source_count = {}
     # Filters packet info to OSI layer 3 only
@@ -34,6 +40,7 @@ def source_addresses():
             if malicious.get(src) >= 1:
                 print (f"more than 100 packets detected from source address {src} to {dst}. \n")
     return source_count
+
 
 # Function to calculate how quickly a client sends packets to a login server, only active if malicious counter >= 1 for any source address
 def packet_timestamp_frequency():
@@ -69,6 +76,7 @@ def packet_timestamp_frequency():
     malicious[client_ip] = malicious.get(client_ip, 0) + 1
     print (f"DEBUG: {malicious}")
 
+
 # Same process as source_addresses() function, except filtering the IP header to show destination address only
 def destination_addresses():
     dest_count = {}
@@ -77,6 +85,7 @@ def destination_addresses():
             dst = pkt[IP].dst
             dest_count[dst] = dest_count.get(dst, 0) + 1
     return dest_count
+
 
 # Function to check if a packet contains a TCP/SYN flag,
 def tcp_syn():
@@ -106,9 +115,9 @@ def uname_alerts():
         src_ip = pkt[IP].src
         # Filtering packet information by payload presence, and showing malicious addresses only
         if Raw in pkt and src_ip in malicious and src_ip not in login_server:
-            # .decode converts a byte string into a readable string (unicode)
+            # .decode converts a byte string into a readable string (unicode), .load accesses the data bytes in the Raw layer of a packet
             payload = pkt[Raw].load.decode()
-            # Removing trailing whitespaces/lines to clean up output
+            # Removing trailing whitespaces/lines to clean up output with .strip
             clean_payload = payload.strip()
             # Adding source address to dictionary to track what usernames it attempts to login to
             if src_ip not in login_tracker:
@@ -125,11 +134,16 @@ def uname_alerts():
                     login_tracker[src_ip][uname] = login_tracker[src_ip].get(uname, 0) + 1
     # These loops will extract keys and values from both nested dictionaries and generate an alert when malicious addresses attempt login to any account
     for address, user in login_tracker.items():
+        # Extracting key-value pairs from user which contain the username accessed, and how many times login was attempted
+        for key, value in user.items():
+            # Failed login threshold set to 10 to minimize false positives
+            if value >= 10:
+                # Increment malicious counter against client address if 10 failed logins detected for one username
+                malicious[address] = malicious.get(address, 0) + 1
         print (f"\n Client: {address} attempted to log in to:")
         for target_user, counter in user.items():
             print (f" {target_user} | {counter} time(s)")
-            
-
+    print (f"DEBUG: {malicious}")
 
 
 # Function that prints an IP address, how many packets it sent/received, and how many times it appeared in the pcap file
@@ -147,7 +161,11 @@ def ip_enumerator():
         print(f"  → Total appearances: {total}\n")
 
 
+print ("\nDEBUG: ip_enumerator():\n")
 ip_enumerator()
+print ("\nDEBUG: tcp_syn():\n")
 tcp_syn()
+print ("\nDEBUG: packet_timestamp_frequency():\n")
 packet_timestamp_frequency()
+print ("\nDEBUG: uname_alerts():\n")
 uname_alerts()
