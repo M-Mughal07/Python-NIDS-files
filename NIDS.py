@@ -146,6 +146,15 @@ def uname_alerts():
     print (f"DEBUG: {malicious}")
 
 
+def malicious_alert_generator():
+    for address, counter in malicious.items():
+        if address not in login_server and counter >= 4:
+            print (f"HIGH ALERT: Malicious client address(es) {address} detected with a threat rating of {counter}")
+        elif address not in login_server and counter >= 2:
+            print (f"Potentially malicious client address(es) {address} detected with a threat rating of {counter}")
+        elif counter < 1:
+            print ("No malicious client addresses detected")
+
 # Function that prints an IP address, how many packets it sent/received, and how many times it appeared in the pcap file
 def ip_enumerator():
     src_ips = source_addresses()
@@ -169,3 +178,5 @@ print ("\nDEBUG: packet_timestamp_frequency():\n")
 packet_timestamp_frequency()
 print ("\nDEBUG: uname_alerts():\n")
 uname_alerts()
+print ("\n DEBUG: malicious_alert_generator():\n")
+malicious_alert_generator()
