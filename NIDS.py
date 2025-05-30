@@ -147,13 +147,21 @@ def uname_alerts():
 
 
 def malicious_alert_generator():
+    # Generator expression that checks all values in the malicious dictionary, returns True if no values are >= 2, and prints alert
+    if not any(counter >= 2 for address, counter in malicious.items()):
+        print ("No malicious client addresses detected")
+        return
+    print ('''
+    Threat rating breakdown:
+    Rating of 2-3: Client address met 2 to 3 malicious communications criteria
+    Rating of 4: Client address met every malicious communications criteria, and is very likely an attacker
+    ''')
+    # Loop that checks values in the malicious dictionary, generates alerts based on the threshold the value reaches
     for address, counter in malicious.items():
         if address not in login_server and counter >= 4:
             print (f"HIGH ALERT: Malicious client address(es) {address} detected with a threat rating of {counter}")
         elif address not in login_server and counter >= 2:
             print (f"Potentially malicious client address(es) {address} detected with a threat rating of {counter}")
-        elif counter < 1:
-            print ("No malicious client addresses detected")
 
 # Function that prints an IP address, how many packets it sent/received, and how many times it appeared in the pcap file
 def ip_enumerator():
