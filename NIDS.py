@@ -16,11 +16,13 @@ login_server = set()
 
 # Assumes the .pcap file is in the same folder as this NIDS.py file
 nids_dir = os.path.dirname(os.path.abspath(__file__))
+# Asking user for name of pcap file
+#pcap_file = input("Enter the name of the packet capture file you want to analyze:")
 pcap_path = os.path.join(nids_dir, "bruteforce.pcap")
 # Loading .pcap file into memory 
 pcap = rdpcap(pcap_path)
 
-
+# Function that checks how many times a source address sent a packet in the pcap file, generates an alert if a threshold is reached
 def source_addresses():
     source_count = {}
     # Filters packet info to OSI layer 3 only
@@ -43,12 +45,16 @@ def source_addresses():
 
 
 # Function to calculate how quickly a client sends packets to a login server, only active if malicious counter >= 1 for any source address
+# Detection is based on intervals between a chunk of packets
 def packet_timestamp_frequency():
     pkt_counter = 0
     # Will check the frequency between blocks of this many packets
     chunk_size = 50
+    chunk_counter = 0
     # Will store every client packet timestamp
     avg_time = []
+    # dictionary for client address, stores value that marks address as having abnormal intervals between packets
+    abnormal_intervals = {}
     for pkt in pcap:
         source_ip = pkt[IP].src
         # Checks if source address is in malicious dictionary, and if it has a malicious weight of >=1, calculates time delta
@@ -61,23 +67,29 @@ def packet_timestamp_frequency():
                 avg_time.append(pkt.time)
                 # Calculates how long it took for the client to send (chunk_size) amount of packets and the average time between each packet (interval)
                 if pkt_counter ==  chunk_size:
-                    # Use negative index to access the last item of a list without knowing the length of the list
+                    # Calculate the time difference between the first packet and the last packet in a chunk
+                    # Uses negative indexing to access the last item of a list without knowing the length of the list
                     delta = avg_time[-1] - avg_time[0]
                     # subtract 1 from the chunk size since intervals between packets have to be calculated
                     avg_interval = delta / (chunk_size - 1)
                     # Assuming HTTPS is being used to login to a web server, the threshold for abnormal packet intervals should be < 5-7 ms
                     if avg_interval < 0.6000:
-                        # Generating alert and rounding the value of avg_interval up to 4 digits 
-                        print (f"{chunk_size} packets detected with abnormal intervals from {client_ip} to {dst_ip} at {avg_interval:.4f} seconds between packets. \n")
+                        chunk_counter += 1
+                        # Setting dictionary value to True for client address since it reached the threshold
+                        abnormal_intervals[client_ip] = True
+                        # Generating alert and rounding the value of avg_interval up to 4 digits
+                        print (f"{chunk_counter}: {chunk_size} packets detected with abnormal intervals from {client_ip} to {dst_ip} at {avg_interval:.4f} seconds between packets.")
                     # Resetting the list and counter variables for the next chunk of packets
                     avg_time = []
                     pkt_counter = 0
-    # Incrementing malicious counter for client address to mark it as potentially malicious
-    malicious[client_ip] = malicious.get(client_ip, 0) + 1
+    # Checking abnormal_intervals value, if True, increment malicious value against a client address
+    if abnormal_intervals[client_ip] == True:
+        # Incrementing malicious counter for client address to mark it as potentially malicious
+        malicious[client_ip] = malicious.get(client_ip, 0) + 1
     print (f"DEBUG: {malicious}")
 
 
-# Same process as source_addresses() function, except filtering the IP header to show destination address only
+# Simmilar process as source_addresses() function, except filtering the IP header to show destination address only, used in the ip_enumerator()
 def destination_addresses():
     dest_count = {}
     for pkt in pcap:
@@ -123,7 +135,6 @@ def uname_alerts():
             if src_ip not in login_tracker:
                 login_tracker[src_ip] = {}
             # Matching a keyword to packet payload to detect if a client attempts login to any username
-            '''Can potentially add HTTP POST request syntax if HTTP(S) is used to login since that will contain the username/pass too'''
             for keyword in ["user", "username", "user name", "uname"]:
                 # Assigning new name to clean_payload for clarity 
                 uname = clean_payload
@@ -159,9 +170,9 @@ def malicious_alert_generator():
     # Loop that checks values in the malicious dictionary, generates alerts based on the threshold the value reaches
     for address, counter in malicious.items():
         if address not in login_server and counter >= 4:
-            print (f"HIGH ALERT: Malicious client address(es) {address} detected with a threat rating of {counter}")
+            print (f"HIGH ALERT: Malicious client(s) ({address}) detected with a threat rating of {counter}")
         elif address not in login_server and counter >= 2:
-            print (f"Potentially malicious client address(es) {address} detected with a threat rating of {counter}")
+            print (f"Potentially malicious client(s) ({address}) detected with a threat rating of {counter}")
 
 # Function that prints an IP address, how many packets it sent/received, and how many times it appeared in the pcap file
 def ip_enumerator():
