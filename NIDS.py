@@ -10,14 +10,12 @@ import os
 # Dictionary variable that will store source IP addresses as the key, and an int as the value representing a malicious weight,
 # the value will increment by 1 if a function determines an address to be potentially malicious.
 malicious = {}
-
 # Variable that will mark the login server as the attack target (Used to filter it out of potential attacker addresses)
 login_server = set()
-
 # Assumes the .pcap file is in the same folder as this NIDS.py file
 nids_dir = os.path.dirname(os.path.abspath(__file__))
 # Asking user for name of pcap file
-#pcap_file = input("Enter the name of the packet capture file you want to analyze:")
+#pcap_file = input("Enter the name of the packet capture file you want to analyze:")                                            CHANGE IN FUTURE
 pcap_path = os.path.join(nids_dir, "bruteforce.pcap")
 # Loading .pcap file into memory 
 pcap = rdpcap(pcap_path)
@@ -47,45 +45,48 @@ def source_addresses():
 # Function to calculate how quickly a client sends packets to a login server, only active if malicious counter >= 1 for any source address
 # Detection is based on intervals between a chunk of packets
 def packet_timestamp_frequency():
-    pkt_counter = 0
+    pkt_counter = {}
     # Will check the frequency between blocks of this many packets
     chunk_size = 50
-    chunk_counter = 0
+    chunk_printout_counter = 0
     # Will store every client packet timestamp
-    avg_time = []
+    avg_time = {}
     # dictionary for client address, stores value that marks address as having abnormal intervals between packets
     abnormal_intervals = {}
     for pkt in pcap:
-        source_ip = pkt[IP].src
-        # Checks if source address is in malicious dictionary, and if it has a malicious weight of >=1, calculates time delta
-        if source_ip in malicious and malicious.get(source_ip) >= 1:  
-            # Isolates packet printout to only show client(s) by performing a membership test against the login_server set
-            if IP in pkt and source_ip not in login_server:
-                client_ip = pkt[IP].src
-                dst_ip = pkt[IP].dst
-                pkt_counter += 1
-                avg_time.append(pkt.time)
-                # Calculates how long it took for the client to send (chunk_size) amount of packets and the average time between each packet (interval)
-                if pkt_counter ==  chunk_size:
-                    # Calculate the time difference between the first packet and the last packet in a chunk
-                    # Uses negative indexing to access the last item of a list without knowing the length of the list
-                    delta = avg_time[-1] - avg_time[0]
-                    # subtract 1 from the chunk size since intervals between packets have to be calculated
-                    avg_interval = delta / (chunk_size - 1)
-                    # Assuming HTTPS is being used to login to a web server, the threshold for abnormal packet intervals should be < 5-7 ms
-                    if avg_interval < 0.6000:
-                        chunk_counter += 1
-                        # Setting dictionary value to True for client address since it reached the threshold
-                        abnormal_intervals[client_ip] = True
-                        # Generating alert and rounding the value of avg_interval up to 4 digits
-                        print (f"{chunk_counter}: {chunk_size} packets detected with abnormal intervals from {client_ip} to {dst_ip} at {avg_interval:.4f} seconds between packets.")
-                    # Resetting the list and counter variables for the next chunk of packets
-                    avg_time = []
-                    pkt_counter = 0
+        # Isolates packet printout to only show client(s) by performing a membership test against the login_server set
+        if IP in pkt and pkt[IP].src not in login_server:
+            client_ip = pkt[IP].src
+            dst_ip = pkt[IP].dst
+            # Adds a client address to the dictionary, then adds a tracker value to that address which represents how many packets the client sent
+            pkt_counter[client_ip] = pkt_counter.get(client_ip, 0) + 1
+            # Checking if a client_ip exists in avg_time as a key, sets the default value to be an empty list and adds the packet timestamp to that list 
+            avg_time.setdefault(client_ip, []).append(pkt.time)
+            abnormal_intervals.setdefault(client_ip, False)
+            # Calculates how long it took for the client to send (chunk_size) amount of packets and the average time between each packet (interval)
+            if pkt_counter.get(client_ip, 0) ==  chunk_size:
+                # Calculate the time difference between the first packet and the last packet in a chunk
+                # Uses negative indexing to access the last item of a list without knowing the length of the list
+                delta = avg_time[client_ip][-1] - avg_time[client_ip][0]
+                # subtract 1 from the chunk size since intervals between packets have to be calculated
+                avg_interval = delta / (chunk_size - 1)
+                # Assuming HTTPS is being used to login to a web server, the threshold for abnormal packet intervals should be < 5-7 ms
+                if avg_interval < 0.6000:
+                    chunk_printout_counter += 1
+                    # Setting dictionary value to True for client address if it reaches the threshold
+                    abnormal_intervals[client_ip] = True
+                    # Generating alert and rounding the value of avg_interval up to 4 digits
+                    print (f"{chunk_printout_counter}: {chunk_size} packets detected with abnormal intervals from {client_ip} to {dst_ip} at {avg_interval:.4f} seconds between packets.")
+                    pkt_counter[client_ip] = 0
+                    avg_time[client_ip] = []
+                # This statement changes the abnormality marker for a client back to false if their packet intervals aren't abnormal anymore
+                else:
+                    abnormal_intervals[client_ip] = False
     # Checking abnormal_intervals value, if True, increment malicious value against a client address
-    if abnormal_intervals[client_ip] == True:
-        # Incrementing malicious counter for client address to mark it as potentially malicious
-        malicious[client_ip] = malicious.get(client_ip, 0) + 1
+    for client, bool in abnormal_intervals.items():
+        if bool:
+            # Incrementing malicious counter for client address to mark it as potentially malicious
+            malicious[client] = malicious.get(client, 0) + 1
     print (f"DEBUG: {malicious}")
 
 
@@ -164,8 +165,8 @@ def malicious_alert_generator():
         return
     print ('''
     Threat rating breakdown:
-    Rating of 2-3: Client address met 2 to 3 malicious communications criteria
-    Rating of 4: Client address met every malicious communications criteria, and is very likely an attacker
+    Rating of 2-3: Client address met 2 to 3 malicious communications checks
+    Rating of 4: Client address met every malicious communications check, and is very likely an attacker
     ''')
     # Loop that checks values in the malicious dictionary, generates alerts based on the threshold the value reaches
     for address, counter in malicious.items():
