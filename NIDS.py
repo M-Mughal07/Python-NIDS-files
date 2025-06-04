@@ -83,8 +83,8 @@ def packet_timestamp_frequency():
                 else:
                     abnormal_intervals[client_ip] = False
     # Checking abnormal_intervals value, if True, increment malicious value against a client address
-    for client, bool in abnormal_intervals.items():
-        if bool:
+    for client, is_abnormal in abnormal_intervals.items():
+        if is_abnormal:
             # Incrementing malicious counter for client address to mark it as potentially malicious
             malicious[client] = malicious.get(client, 0) + 1
     print (f"DEBUG: {malicious}")
